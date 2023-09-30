@@ -3,9 +3,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
 from statsmodels.tools.tools import add_constant
+from sklearn.linear_model import LinearRegression
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 # from documentation: 'Note: 9’s in a field (e.g.9999) indicate missing data or data that has not been received'
@@ -23,13 +22,17 @@ data.index = data['DATE']
 TARGET = 'TMAX_NEXT_DAY'
 data[TARGET] = data.groupby(['STATION']).TMAX.shift(-1)
 
+core_features = ['PRCP', 'TMIN', 'TMAX']
 # since there are multiple stations in the data, we would generate categorical variable based on STATION
 # but since only one station actually has non-null TMAX values, we will not do this and instead
 # remove null station data
-data = data[pd.notnull(data.STATION)]
+data = data[[TARGET] + core_features].dropna()
 
-# core temperature features
-core_features = ['PRCP', 'TMIN', 'TMAX']
+# generate additional features
+for col in ['TMIN', 'TMAX']:
+    col_30_day_mean = f'{col}_30_DAY'
+    data[col_30_day_mean] = data[col].rolling(30).mean()
+    core_features.append(col_30_day_mean)
 
 # filter only for core features plus target
 data_filtered = data[[TARGET] + core_features]
@@ -38,16 +41,16 @@ data_filtered = data[[TARGET] + core_features]
 # its a small % so we remove to facilitate analysis
 data_filtered = data_filtered.dropna()
 
-# Check linear relationship between features and target
-for feature in core_features:
-    plt.scatter(data_filtered[feature], data_filtered[TARGET])
-    plt.show()
+# # Check linear relationship between features and target
+# for feature in core_features:
+#     plt.scatter(data_filtered[feature], data_filtered[TARGET])
+#     plt.show()
 
-# Check for multicollinearity within data
-X = add_constant(data_filtered[core_features])
-vif_data = pd.Series([variance_inflation_factor(X.values, i) 
-                      for i in range(X.shape[1])], index=X.columns)
-print(vif_data)
+# # Check for multicollinearity within data
+# X = add_constant(data_filtered[core_features])
+# vif_data = pd.Series([variance_inflation_factor(X.values, i) 
+#                       for i in range(X.shape[1])], index=X.columns)
+# print(vif_data)
 
 # correlation matrix
 matrix = data_filtered.corr().round(2)
@@ -72,9 +75,9 @@ plt.show()
 r_squared = regr.score(data_test[core_features], data_test[TARGET])
 print(r_squared)
 
-print(len(data_test[core_features]))
-print(len(predictions))
-
-# get our mae
+# get the mae
 mae = mean_absolute_error(data_test[TARGET], predictions)
 print(mae)
+
+# take a look at the coefficients
+print(regr.coef_)
