@@ -3,6 +3,7 @@ import pandas as pd
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 
+from weather import utils
 from weather.ridge_regression import ridge_regression
 from weather.linear_regression import linear_regression
 
@@ -95,8 +96,7 @@ if __name__ == '__main__':
         _generate_correlation_matrix(data_filtered=data_filtered)
 
     # split model into train and test data
-    data_train = data_filtered[data_filtered.index < pd.to_datetime('6/1/2017')]
-    data_test = data_filtered[data_filtered.index >= pd.to_datetime('6/1/2017')]
+    data_train, data_test = utils.generate_test_train(data=data_filtered)
 
     # check normal distribution of features
     if do_normal_feature_distribution:
@@ -113,5 +113,4 @@ if __name__ == '__main__':
     # run ridge regression model
     ridge_regression(target=TARGET,
                      core_features=core_features,
-                     data_test=data_test,
-                     data_train=data_train)
+                     data=data_filtered)
