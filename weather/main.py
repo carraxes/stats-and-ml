@@ -1,6 +1,10 @@
-from weather.linear_regression import linear_regression
-
+import numpy as np
 import pandas as pd
+import scipy.stats as stats
+import matplotlib.pyplot as plt
+
+from weather.ridge_regression import ridge_regression
+from weather.linear_regression import linear_regression
 
 # from documentation: 'Note: 9’s in a field (e.g.9999) indicate missing data or data that has not been received'
 # remove these values as they are not valid to use in analysis
@@ -9,7 +13,105 @@ import pandas as pd
 # load in austin weather data for zipcode 78731 attained from NOAA
 data = pd.read_csv('./data/weather/Austin - 78731.csv', parse_dates=['DATE'])
 
-if __name__ == '__main__':
+def _generate_feature_distributions(target: str, core_features: list, data_filtered: pd.DataFrame) -> None:
+    """check linear relationship between features and target."""
+    for feature in core_features:
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        stats.probplot(data_filtered[feature], dist="norm", plot=axs[0])
+        axs[0].set_title('Q-Q Plot')
 
-    # run linear regression model on weather data
-    linear_regression(data=data)
+        axs[1].hist(data_filtered[feature], bins=20, alpha=0.2)
+        axs[1].set_title('Histogram')
+
+        plt.tight_layout()
+        plt.show()
+
+def _generate_linear_comparisons(target: str, core_features: list, data_filtered: pd.DataFrame) -> None:
+    """check linear relationship between features and target."""
+    for feature in core_features:
+        plt.scatter(data_filtered[feature], data_filtered[TARGET])
+        plt.show()
+
+def _generate_vif_test(core_features: list, data_filtered: pd.DataFrame) -> None:
+    """check for multicollinearity within data."""
+    X = add_constant(data_filtered[core_features])
+    vif_data = pd.Series([variance_inflation_factor(X.values, i) 
+                          for i in range(X.shape[1])], index=X.columns)
+    print(vif_data)
+
+def _generate_correlation_matrix(data_filtered: pd.DataFrame) -> None:
+    """correlation matrix."""
+    matrix = data_filtered.corr().round(2)
+    sns.heatmap(matrix, annot=True)
+    plt.show()
+
+if __name__ == '__main__':
+    do_vif_test = False
+    do_linear_comparison = False
+    do_correlation_matrix = False
+    do_normal_feature_distribution = False
+
+    # make index as date
+    data = data.sort_values(by=['DATE'])
+    data.index = data['DATE']
+
+    # shift TMAX value by one groupbed by STATION
+    TARGET = 'TMAX_NEXT_DAY'
+    data[TARGET] = data.groupby(['STATION']).TMAX.shift(-1)
+
+    core_features = ['TMIN', 'TMAX']
+    # since there are multiple stations in the data, we would generate categorical variable based on STATION
+    # but since only one station actually has non-null TMAX values, we will not do this and instead
+    # remove null station data
+    data = data[[TARGET] + core_features].dropna()
+
+    # generate additional features
+    for col in ['TMIN', 'TMAX']:
+        col_20_day_mean = f'{col}_20_DAY_AVG'
+        col_10_day_mean = f'{col}_10_DAY_AVG'
+        data[col_20_day_mean] = data[col].rolling(20).mean()
+        data[col_10_day_mean] = data[col].rolling(10).mean()
+        core_features.extend([col_10_day_mean, col_20_day_mean])
+
+    # filter only for core features plus target
+    data_filtered = data[[TARGET] + core_features]
+
+    # remove all na values, while we could fill in the NULL percipitation values
+    # its a small % so we remove to facilitate analysis
+    data_filtered = data_filtered.dropna()
+
+    # check linear relationship between features and target
+    if do_linear_comparison:
+        _generate_linear_comparisons(target=TARGET,
+                                     core_features=core_features,
+                                     data_filtered=data_filtered)
+
+    # check for multicollinearity within data
+    if do_vif_test:
+        _generate_vif_test(core_features=core_features, data_filtered=data_filtered)
+
+    # correlation matrix
+    if do_correlation_matrix:
+        _generate_correlation_matrix(data_filtered=data_filtered)
+
+    # split model into train and test data
+    data_train = data_filtered[data_filtered.index < pd.to_datetime('6/1/2017')]
+    data_test = data_filtered[data_filtered.index >= pd.to_datetime('6/1/2017')]
+
+    # check normal distribution of features
+    if do_normal_feature_distribution:
+        _generate_feature_distributions(target=TARGET,
+                                        core_features=core_features,
+                                        data_filtered=data_train)
+
+    # run linear regression model
+    linear_regression(target=TARGET,
+                      core_features=core_features,
+                      data_test=data_test,
+                      data_train=data_train)
+
+    # run ridge regression model
+    ridge_regression(target=TARGET,
+                     core_features=core_features,
+                     data_test=data_test,
+                     data_train=data_train)
