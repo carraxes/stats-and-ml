@@ -1,18 +1,17 @@
 import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from statsmodels.tools.tools import add_constant
 from sklearn.linear_model import LinearRegression
-from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-from weather import utils
+from weather.utils import (
+    generate_evals,
+    generate_residual_plot
+)
 
 def linear_regression(target: str,
                       core_features: list,
                       data_test: pd.DataFrame,
                       data_train: pd.DataFrame,
-                      do_residuals: bool = False) -> None:
+                      do_residuals: bool = True) -> None:
     """Linear regression model on weather data from NOAA."""
 
     # fit model with data
@@ -23,17 +22,10 @@ def linear_regression(target: str,
 
     # get predictions and generate residuals and plot
     if do_residuals:
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        axs[0].scatter(predictions, residuals)
-        axs[0].set_title('Residual Plot')
-
-        axs[1].hist(residuals, bins=20, alpha=0.2)
-        axs[1].set_title('Residual Histogram')
-
-        plt.tight_layout()
-        plt.show()
+        generate_residual_plot(residuals=residuals,
+                               predictions=predictions)
 
     # generate all evals
-    utils.generate_evals(target=target,
-                         predictions=predictions,
-                         data_test=data_test)
+    generate_evals(target=target,
+                   predictions=predictions,
+                   data_test=data_test)
