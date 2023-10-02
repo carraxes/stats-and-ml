@@ -3,9 +3,9 @@ import pandas as pd
 from typing import Tuple
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
-    r2_score,
     mean_absolute_error,
-    mean_squared_error)
+    mean_squared_error,
+    r2_score)
 
 def generate_residual_plot(residuals: np.ndarray, predictions: np.ndarray) -> None:
     """generate residual plot and histogram after fitting model."""
